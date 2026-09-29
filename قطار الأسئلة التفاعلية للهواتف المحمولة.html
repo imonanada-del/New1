@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>قطار الأسئلة التفاعلية - دعاء الاستعاذة</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            dark: '#0B192C',
+                            DEFAULT: '#1E3E62',
+                            light: '#2D5584'
+                        },
+                        gold: {
+                            DEFAULT: '#FFD700',
+                            dark: '#D4AF37',
+                            light: '#FFF099'
+                        },
+                        sky: {
+                            DEFAULT: '#80C4E9',
+                            light: '#E1F5FE'
+                        }
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(180deg, #0B192C 0%, #1E3E62 100%);
+            touch-action: manipulation;
+        }
+
+        /* Hide Scrollbar for clean mobile look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Shake animation for wrong answer */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .shake-err {
+            animation: shake 0.4s ease-in-out;
+            border-color: #EF4444 !important;
+        }
+
+        /* Train animation smoothness */
+        .train-wrapper {
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Wheel Rotation */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .wheel-spinning {
+            animation: spin 0.5s linear infinite;
+        }
+
+        /* Glow Effect for active car */
+        .active-car {
+            box-shadow: 0 0 12px #FFD700;
+            border-color: #FFD700 !important;
+            transform: scale(1.03);
+        }
+    </style>
+</head>
+<body class="min-h-screen max-w-md mx-auto text-white flex flex-col justify-between select-none relative shadow-2xl border-x border-gold/20">
+
+    <!-- 1. LOGIN MODAL OVERLAY (MOBILE OPTIMIZED) -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/95 backdrop-blur-md p-4 max-w-md mx-auto">
+        <div class="bg-navy p-6 rounded-3xl border-2 border-gold w-full text-center shadow-2xl relative">
+            
+            <div class="w-16 h-16 bg-gold/20 rounded-full flex items-center justify-center mx-auto mb-3 border-2 border-gold text-gold text-2xl">
+                <i class="fa-solid fa-train"></i>
+            </div>
+
+            <h1 class="text-2xl font-black text-gold mb-1">قطار الأسئلة التفاعلية</h1>
+            <p class="text-sky mb-4 text-xs font-bold leading-relaxed bg-navy-dark/60 p-2 rounded-xl border border-sky/30">
+                حديث: "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ زَوَالِ نِعْمَتِكَ وَتَحَوُّلِ عَافِيَتِكَ..."
+            </p>
+
+            <div class="space-y-3 text-right">
+                <label for="student-name" class="block text-xs font-bold text-gray-200">أدخل اسم الطالب/الطالبة للبدء:</label>
+                <input type="text" id="student-name" placeholder="اكتب الاسم هنا..." 
+                    class="w-full px-4 py-3 rounded-xl bg-navy-dark border-2 border-sky text-white text-base focus:outline-none focus:border-gold text-center font-bold">
+                <p id="login-error" class="text-red-400 text-xs hidden font-bold text-center">
+                    <i class="fa-solid fa-triangle-exclamation"></i> يرجى إدخال الاسم أولاً!
+                </p>
+            </div>
+
+            <button onclick="startGame()" class="w-full mt-5 bg-gold active:bg-gold-dark text-navy-dark font-black text-lg py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                <span>انطلاق اللعبة</span>
+                <i class="fa-solid fa-circle-play"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME HEADER -->
+    <header class="bg-navy/90 border-b border-gold/30 p-3 sticky top-0 z-30 backdrop-blur-md">
+        <div class="flex justify-between items-center gap-2">
+            <!-- Student Info Display -->
+            <div class="flex items-center gap-2 bg-navy-dark px-3 py-1.5 rounded-xl border border-gold/40 max-w-[170px]">
+                <div class="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-navy-dark font-bold text-xs shrink-0">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+                <div class="truncate">
+                    <span class="text-[10px] text-sky block leading-none">البطل</span>
+                    <span id="player-display-name" class="text-xs font-black text-gold truncate block">----</span>
+                </div>
+            </div>
+
+            <!-- Score & Sound -->
+            <div class="flex items-center gap-2">
+                <div class="bg-navy-dark px-3 py-1.5 rounded-xl border border-sky/40 text-center">
+                    <span class="text-[10px] text-sky block leading-none">النقاط</span>
+                    <span id="score-display" class="text-sm font-black text-gold">0 / 16</span>
+                </div>
+                <button onclick="toggleAudio()" id="audio-btn" class="w-9 h-9 bg-navy-dark border border-gold/40 rounded-xl text-gold active:scale-95 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN GAME AREA -->
+    <main class="flex-1 p-3 flex flex-col gap-3 justify-between">
+
+        <!-- TRAIN TRACK DISPLAY -->
+        <section class="bg-navy-dark/70 rounded-2xl p-2.5 border border-gold/30 shadow-md relative overflow-hidden">
+            <div class="flex justify-between items-center mb-1.5 px-1">
+                <span class="text-[11px] font-bold text-sky"><i class="fa-solid fa-route"></i> مسار القطار</span>
+                <span id="train-status" class="text-[11px] font-bold text-gold">السؤال 1 من 16</span>
+            </div>
+
+            <!-- Train Scroll Track -->
+            <div id="track-scroll" class="no-scrollbar overflow-x-auto pb-3 pt-1 px-1 relative scroll-smooth">
+                <!-- Rails -->
+                <div class="absolute bottom-6 left-0 right-0 h-2 bg-gray-600 rounded-full border-t border-gray-400"></div>
+
+                <!-- Train Assembly Wrapper -->
+                <div id="train-assembly" class="train-wrapper flex items-end gap-1.5 relative min-w-max">
+                    
+                    <!-- ENGINE -->
+                    <div class="relative flex flex-col items-center z-20 shrink-0">
+                        <div class="w-24 h-20 bg-gradient-to-t from-red-800 to-red-600 rounded-t-2xl border-2 border-gold flex flex-col justify-between p-1 shadow-md relative">
+                            <!-- Chimney -->
+                            <div class="absolute -top-4 right-2 w-4 h-5 bg-gray-800 border border-gold rounded-t-sm flex items-center justify-center">
+                                <div class="w-1.5 h-1.5 bg-gray-300 rounded-full animate-ping"></div>
+                            </div>
+                            <div class="flex justify-center items-center bg-sky-light/20 py-0.5 rounded border border-gold/40">
+                                <span class="text-[9px] font-black text-gold">القطار</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-1 px-1">
+                                <div class="w-2.5 h-2.5 bg-yellow-300 rounded-full animate-pulse shadow-[0_0_8px_#FFD700]"></div>
+                                <i class="fa-solid fa-train text-xs text-white"></i>
+                            </div>
+                        </div>
+                        <!-- Engine Wheels -->
+                        <div class="flex gap-1 -mt-2 z-10">
+                            <div class="wheel w-6 h-6 rounded-full bg-gray-900 border-2 border-gold flex items-center justify-center">
+                                <div class="w-1 h-1 bg-white rounded-full"></div>
+                            </div>
+                            <div class="wheel w-6 h-6 rounded-full bg-gray-900 border-2 border-gold flex items-center justify-center">
+                                <div class="w-1 h-1 bg-white rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARS CONTAINER -->
+                    <div id="train-cars-container" class="flex items-end gap-2"></div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- QUESTION CARD -->
+        <section class="bg-navy p-4 rounded-2xl border-2 border-gold/40 shadow-lg flex flex-col justify-between my-auto">
+            <div class="flex justify-between items-center mb-2 border-b border-white/10 pb-2">
+                <span id="question-badge" class="bg-gold text-navy-dark px-3 py-0.5 rounded-full font-black text-xs flex items-center gap-1">
+                    <i class="fa-solid fa-circle-question"></i> السؤال رقم 1
+                </span>
+                <span class="text-[10px] text-sky font-semibold"><i class="fa-solid fa-hand-pointer"></i> انقر الإجابة الصحيحة</span>
+            </div>
+
+            <!-- Question Text -->
+            <div class="my-3 min-h-[70px] flex items-center">
+                <h3 id="question-text" class="text-base font-bold text-white leading-relaxed text-right w-full">
+                    جاري تحميل السؤال...
+                </h3>
+            </div>
+        </section>
+
+        <!-- OPTIONS AREA (TAP TO CHOOSE) -->
+        <section class="space-y-2">
+            <h4 class="text-xs font-bold text-gold mb-1 flex items-center gap-1">
+                <i class="fa-solid fa-list-ul"></i> اختر الإجابة المناسبة للعربة:
+            </h4>
+            
+            <div id="options-container" class="space-y-2">
+                <!-- Options populated by JS -->
+            </div>
+
+            <!-- Feedback Message -->
+            <div id="feedback-box" class="p-2.5 rounded-xl text-center font-bold text-sm hidden transition-all">
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-navy-dark border-t border-white/10 p-2 text-center text-[10px] text-sky">
+        <p>قطار الأسئلة التفاعلية - دعاء الاستعاذة من زوال النعمة © 2026</p>
+    </footer>
+
+    <!-- WIN CONGRATULATION MODAL WITH GIFT ICON -->
+    <div id="win-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-navy-dark/95 backdrop-blur-lg hidden p-4 max-w-md mx-auto">
+        <div class="bg-navy border-2 border-gold p-6 rounded-3xl w-full text-center shadow-2xl relative">
+            
+            <!-- GIFT ICON BOX -->
+            <div class="w-18 h-18 bg-gold/20 rounded-full border-2 border-gold flex items-center justify-center mx-auto mb-3 text-gold text-4xl animate-bounce p-4">
+                <i class="fa-solid fa-gift"></i>
+            </div>
+
+            <h2 class="text-2xl font-black text-gold mb-1">مُبَارَكٌ يَا بَطَلُ!</h2>
+            <p class="text-white text-sm mb-3">لقد أتممت الرحلة ووصل القطار إلى النهاية بنجاح!</p>
+            
+            <div class="bg-navy-dark/80 p-3 rounded-xl border border-sky/30 my-3 text-right space-y-1 text-xs">
+                <p class="text-sky">اسم المتسابق: <span id="win-student-name" class="font-bold text-gold"></span></p>
+                <p class="text-sky">النتيجة: <span id="win-score" class="font-bold text-gold">16 / 16</span></p>
+                <p class="text-sky">التقييم: <span class="font-bold text-emerald-400">ممتاز جداً 🌟</span></p>
+            </div>
+
+            <p class="text-gold font-bold text-xs mb-4">"أَحْسَنْتَ وَوَفَّقَكَ اللَّهُ دَائِمًا لِكُلِّ خَيْرٍ!"</p>
+
+            <button onclick="restartGame()" class="w-full bg-gold active:bg-gold-dark text-navy-dark font-black text-base py-3 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                <span>إعادة اللعب</span>
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        /* NEW QUESTIONS DATABASE FOR THE HADITH & DUA */
+        const questionsData = [
+            // Section 1: True or False (9 Questions)
+            { id: 1, text: "استعاذ الرسول -صلى الله عليه وسلم- من أربعة أمور.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 2, text: "زوال النعمة هو الذهاب الكلي للنعم.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 3, text: "العافية هي السلامة من الأمراض والآفات في الدين والبدن.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 4, text: "التحول هو عدم التغير والانتقال من حال إلى حال.", options: ["✅ صح", "❎ خطأ"], correct: "❎ خطأ" },
+            { id: 5, text: "يجب على المسلم أن يحافظ على هذا الدعاء لما فيه من خير الدنيا والآخرة.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 6, text: "المحافظة على النعم تكون بشكرها.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 7, text: "وجوب اللجوء إلى الله والافتقار إليه لدوام النعم والسلامة من النقم.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            { id: 8, text: "سخط الله يعني رضاه عن العبد.", options: ["✅ صح", "❎ خطأ"], correct: "❎ خطأ" },
+            { id: 9, text: "سخط الله يأتي بالوقوع في المحرمات أو التقصير في الواجبات.", options: ["✅ صح", "❎ خطأ"], correct: "✅ صح" },
+            
+            // Section 2: Hadith & Vocabularies Multiple Choice (7 Questions)
+            { id: 10, text: "معنى «أعوذ بك» في الدعاء الشريف:", options: ["ألتجئ وأتحصن بالله وحده ليحميني مما أخاف وأحذر", "أتمنى ألا يحدث لي أي مكروه"], correct: "ألتجئ وأتحصن بالله وحده ليحميني مما أخاف وأحذر" },
+            { id: 11, text: "المقصود بـ «زوال النعمة»:", options: ["انتقال النعمة إلى شخص آخر", "فقدان وذهاب نعمة الله سواء الدينية أو الدنيوية"], correct: "فقدان وذهاب نعمة الله سواء الدينية أو الدنيوية" },
+            { id: 12, text: "معنى «تحول العافية»:", options: ["انقلاب الصحة والعافية إلى مرض وبلاء وشدة", "دوام الصحة والسلامة واستمرارها"], correct: "انقلاب الصحة والعافية إلى مرض وبلاء وشدة" },
+            { id: 13, text: "المقصود من قوله «فجأة نقمتك» أنه يستعيذ من:", options: ["عذاب الله وعقوبته التي تأتي بغتة دون إنذار مسبق", "الابتلاء الذي يصيب الإنسان فيرفع درجة العبد الصابر"], correct: "عذاب الله وعقوبته التي تأتي بغتة دون إنذار مسبق" },
+            { id: 14, text: "استعاذ النبي ﷺ من جميع ما يسخط الله عز وجل؛ لأنه سبحانه إذا سخط على العبد فقد هلك وخسر.", options: ["صح", "خطأ"], correct: "صح" },
+            { id: 15, text: "كيف تُحفظ النعم وتدوم للإنسان؟", options: ["بإخفاء النعم تمامًا عن أعين الناس وعدم إظهارها", "بشكر الله -سبحانه- المنعم بالقلب واللسان والجوارح واستخدامها في طاعة الله"], correct: "بشكر الله -سبحانه- المنعم بالقلب واللسان والجوارح واستخدامها في طاعة الله" },
+            { id: 16, text: "تعلمنا من دعاء النبي -صلى الله عليه وسلم-:", options: ["الافتقار والالتجاء إلى الله تعالى والاستعاذة به من كل ما نخاف منه", "الحرص على الابتعاد عن كل ما يغضب الله تعالى", "العافية بها صلاح الدين والدنيا", "جميع ما سبق"], correct: "جميع ما سبق" }
+        ];
+
+        const positivePhrases = [
+            "أَحْسَنْتَ يَا بَطَلُ! إِجَابَةٌ رَائِعَةٌ!",
+            "مُبْتَكِرٌ وَمُتَفَوِّقٌ! أَنْتَ تَتَقَدَّمُ!",
+            "مَاشَاءَ اللَّهُ! إِجَابَةٌ صَحِيحَةٌ!",
+            "رَائِعٌ جِدًّا! عَقْلُكَ الذَّكِيُّ يَنُورُ!",
+            "بَارَكَ اللَّهُ فِيكَ! خَطْوَةٌ مُوَفَّقَةٌ!",
+            "عَمَلٌ مُمَيَّزٌ! اسْتَمِرَّ فِي التَّأَلُّقِ!"
+        ];
+
+        let studentName = "";
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let audioMuted = false;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (audioMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'whistle') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.linearRampToValueAtTime(950, now + 0.1);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(120, now + 0.25);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+        }
+
+        function toggleAudio() {
+            audioMuted = !audioMuted;
+            const btn = document.getElementById('audio-btn');
+            if (audioMuted) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+                btn.classList.add('text-red-400');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+                btn.classList.remove('text-red-400');
+            }
+        }
+
+        function startGame() {
+            const input = document.getElementById('student-name');
+            const name = input.value.trim();
+            const errorMsg = document.getElementById('login-error');
+
+            if (!name) {
+                errorMsg.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+
+            studentName = name;
+            document.getElementById('player-display-name').textContent = studentName;
+            document.getElementById('login-modal').classList.add('hidden');
+
+            initAudio();
+            playSound('whistle');
+
+            buildTrainCars();
+            loadQuestion(0);
+        }
+
+        function buildTrainCars() {
+            const container = document.getElementById('train-cars-container');
+            container.innerHTML = '';
+
+            questionsData.forEach((q, index) => {
+                const car = document.createElement('div');
+                car.id = `car-${index}`;
+                car.className = `car-item relative flex flex-col items-center transition-all duration-300 shrink-0`;
+                
+                car.innerHTML = `
+                    <div class="absolute -right-2 bottom-4 w-2 h-1.5 bg-gray-500 z-0"></div>
+
+                    <div id="car-body-${index}" class="w-24 h-20 bg-navy border-2 border-sky/50 rounded-xl p-1.5 flex flex-col justify-between items-center shadow-md relative z-10 transition-all">
+                        
+                        <div class="flex justify-between items-center w-full">
+                            <span class="text-[9px] font-bold bg-navy-dark px-1.5 py-0.5 rounded text-gold border border-gold/30">عربة #${q.id}</span>
+                            <span id="car-status-icon-${index}" class="text-sky text-[10px]">
+                                <i class="fa-solid fa-lock text-gray-400"></i>
+                            </span>
+                        </div>
+
+                        <div id="car-slot-${index}" class="w-full flex-1 my-0.5 border border-dashed border-sky/30 rounded flex items-center justify-center p-0.5 text-center bg-navy-dark/50 overflow-hidden">
+                            <span id="car-placeholder-${index}" class="text-[9px] text-sky/60">سؤال ${q.id}</span>
+                        </div>
+
+                        <div class="w-full text-center">
+                            <span id="car-state-text-${index}" class="text-[8px] font-bold text-gray-300">في الانتظار</span>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 -mt-2 z-10">
+                        <div class="wheel-${index} w-5 h-5 rounded-full bg-gray-900 border-2 border-gold flex items-center justify-center">
+                            <div class="w-1 h-1 bg-sky rounded-full"></div>
+                        </div>
+                        <div class="wheel-${index} w-5 h-5 rounded-full bg-gray-900 border-2 border-gold flex items-center justify-center">
+                            <div class="w-1 h-1 bg-sky rounded-full"></div>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(car);
+            });
+        }
+
+        function loadQuestion(index) {
+            currentQuestionIndex = index;
+            const q = questionsData[index];
+
+            document.getElementById('question-badge').innerHTML = `<i class="fa-solid fa-circle-question"></i> السؤال ${q.id} من ${questionsData.length}`;
+            document.getElementById('train-status').textContent = `السؤال: ${q.id} من ${questionsData.length}`;
+            document.getElementById('question-text').textContent = q.text;
+
+            questionsData.forEach((_, i) => {
+                const carBody = document.getElementById(`car-body-${i}`);
+                if (i === index) {
+                    carBody.classList.add('active-car');
+                } else {
+                    carBody.classList.remove('active-car');
+                }
+            });
+
+            // Populate Options for simple tapping
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            q.options.forEach((optText) => {
+                const optBtn = document.createElement('button');
+                optBtn.className = `w-full bg-navy-dark hover:bg-navy border-2 border-gold/60 active:border-gold text-gold hover:text-white p-3 rounded-xl font-bold text-sm leading-relaxed text-right flex items-center justify-between shadow transition-all active:scale-98 gap-2`;
+                optBtn.innerHTML = `
+                    <span class="flex-1">${optText}</span>
+                    <i class="fa-solid fa-chevron-left text-sky text-xs shrink-0"></i>
+                `;
+
+                optBtn.onclick = () => checkAnswer(optText);
+                optionsContainer.appendChild(optBtn);
+            });
+
+            const fb = document.getElementById('feedback-box');
+            fb.className = "p-2.5 rounded-xl text-center font-bold text-sm hidden transition-all";
+
+            scrollToActiveCar(index);
+        }
+
+        function scrollToActiveCar(index) {
+            const carElement = document.getElementById(`car-${index}`);
+            if (carElement) {
+                carElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+
+        function checkAnswer(selectedOption) {
+            const currentQ = questionsData[currentQuestionIndex];
+            const isCorrect = (selectedOption === currentQ.correct);
+
+            if (isCorrect) {
+                playSound('correct');
+                playSound('whistle');
+                triggerConfetti();
+
+                score++;
+                document.getElementById('score-display').textContent = `${score} / ${questionsData.length}`;
+
+                const carBody = document.getElementById(`car-body-${currentQuestionIndex}`);
+                const carSlot = document.getElementById(`car-slot-${currentQuestionIndex}`);
+                const carStateText = document.getElementById(`car-state-text-${currentQuestionIndex}`);
+                const carStatusIcon = document.getElementById(`car-status-icon-${currentQuestionIndex}`);
+
+                carBody.classList.remove('border-sky/50');
+                carBody.classList.add('border-emerald-400', 'bg-emerald-950/40');
+                carSlot.innerHTML = `<span class="text-[9px] font-black text-gold truncate">${selectedOption}</span>`;
+                carStateText.textContent = "مكتملة ✅";
+                carStateText.className = "text-[8px] font-bold text-emerald-400";
+                carStatusIcon.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-xs"></i>`;
+
+                const randomMsg = positivePhrases[Math.floor(Math.random() * positivePhrases.length)];
+                showFeedback(true, randomMsg);
+
+                animateTrainMove();
+
+                setTimeout(() => {
+                    if (currentQuestionIndex < questionsData.length - 1) {
+                        loadQuestion(currentQuestionIndex + 1);
+                    } else {
+                        endGame();
+                    }
+                }, 1400);
+
+            } else {
+                playSound('wrong');
+
+                const carBody = document.getElementById(`car-body-${currentQuestionIndex}`);
+                carBody.classList.add('shake-err');
+                
+                setTimeout(() => {
+                    carBody.classList.remove('shake-err');
+                }, 500);
+
+                showFeedback(false, "حاول مرة أخرى!");
+            }
+        }
+
+        function animateTrainMove() {
+            const wheels = document.querySelectorAll('.wheel, [class*="wheel-"]');
+            wheels.forEach(w => w.classList.add('wheel-spinning'));
+
+            const trainAssembly = document.getElementById('train-assembly');
+            trainAssembly.style.transform = 'translateX(-10px)';
+
+            setTimeout(() => {
+                trainAssembly.style.transform = 'translateX(0px)';
+                wheels.forEach(w => w.classList.remove('wheel-spinning'));
+            }, 600);
+        }
+
+        function showFeedback(isSuccess, message) {
+            const fb = document.getElementById('feedback-box');
+            fb.classList.remove('hidden', 'bg-emerald-900/80', 'text-emerald-200', 'border-emerald-500', 'bg-red-900/80', 'text-red-200', 'border-red-500');
+            
+            if (isSuccess) {
+                fb.classList.add('bg-emerald-900/90', 'text-emerald-200', 'border', 'border-emerald-500');
+                fb.innerHTML = `<i class="fa-solid fa-star text-gold text-sm mr-1"></i> ${message}`;
+            } else {
+                fb.classList.add('bg-red-900/90', 'text-red-200', 'border', 'border-red-500');
+                fb.innerHTML = `<i class="fa-solid fa-circle-xmark text-red-400 text-sm mr-1"></i> ${message}`;
+            }
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 35,
+                    spread: 50,
+                    origin: { y: 0.8 }
+                });
+            }
+        }
+
+        function endGame() {
+            document.getElementById('win-student-name').textContent = studentName;
+            document.getElementById('win-score').textContent = `${score} / ${questionsData.length}`;
+            document.getElementById('win-modal').classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 85,
+                    spread: 75,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function restartGame() {
+            score = 0;
+            currentQuestionIndex = 0;
+            document.getElementById('score-display').textContent = `0 / ${questionsData.length}`;
+            document.getElementById('win-modal').classList.add('hidden');
+            
+            buildTrainCars();
+            loadQuestion(0);
+        }
+    </script>
+</body>
+</html>
